@@ -12,14 +12,14 @@ configure the sync setup?" Any authenticated owner is the only one
 who has any business touching it; everyone else gets 403. There is
 nothing to map to or auto-create.
 
-Two paths bypass the JWT check:
+One path bypasses the JWT check:
 
   * /rest/noauth/health — Syncthing's built-in unauthenticated health
     endpoint. The OpenHost router's liveness probe hits this; we let
     it through without a cookie so the app stays "healthy" in the
     router's view even before any human has logged in.
 
-  * (no others) — every other path requires a valid owner JWT.
+Every other path requires a valid owner JWT.
 
 We strip any inbound `X-Openhost-User` header on every request: not
 because Syncthing reads it (it doesn't), but as defence-in-depth

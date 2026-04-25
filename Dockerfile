@@ -7,11 +7,10 @@
 #     for our auth-proxy sidecar (auth_proxy.py).
 #   * bash — start.sh uses `wait -n`, which Alpine's default
 #     /bin/sh (busybox ash) does not implement.
-#   * curl — the official image's bundled entrypoint script
-#     (/bin/entrypoint.sh) uses curl for the healthcheck command;
-#     our healthcheck path goes through the OpenHost router, so we
-#     don't actually need curl, but several debug paths in the
-#     image's existing scripts also reach for it. Cheap to keep.
+#   * su-exec — used by start.sh to drop privileges back to the
+#     unprivileged syncthing user when launching the daemon. Already
+#     present in the upstream image but listed explicitly so a
+#     future base-image change doesn't silently remove it.
 #
 # We bypass the upstream entrypoint entirely. It does PUID/PGID
 # remapping, which OpenHost handles via its container runtime, and
