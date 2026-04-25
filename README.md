@@ -20,7 +20,7 @@ On first boot the container:
    - Sets `insecureSkipHostcheck=true` so the sidecar's rewritten Host header doesn't get rejected
    - Pins the sync ports to TCP+QUIC `0.0.0.0:22000` (matching the `[[ports]]` entries in `openhost.toml`)
    - Disables the in-app self-upgrader (`STNOUPGRADE=1`) — upgrades happen via the OpenHost reload-with-update flow
-3. Starts Syncthing as the unprivileged `syncthing` user via `su-exec`.
+3. Starts Syncthing as the unprivileged UID 1000 (configurable via `PUID`/`PGID`) via `su-exec`. The upstream image uses numeric IDs and does not create a named user.
 4. Starts the auth-proxy sidecar (`auth_proxy.py`) on `0.0.0.0:8384`.
 
 If either child process exits, the container exits and OpenHost restarts it.

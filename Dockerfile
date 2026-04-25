@@ -17,9 +17,10 @@
 # starts syncthing under su-exec which would lose track of our
 # auth-proxy sidecar. Our start.sh runs as root and starts both
 # processes itself (the sidecar runs as root because it binds the
-# container's main port; syncthing runs via `su-exec syncthing` so
-# its data files are owned by the unprivileged user, matching the
-# upstream image's behavior).
+# container's main port; syncthing runs via `su-exec 1000:1000` so
+# its data files are owned by the unprivileged UID, matching the
+# upstream image's behavior — the upstream image does not create a
+# named user, just uses numeric IDs).
 
 # Pin to a specific version rather than `latest` so deploys are
 # reproducible. v1.30.0 is the September 2025 release. Bump

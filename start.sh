@@ -198,12 +198,13 @@ cat > "$CONFIG_FILE" <<XML
 </configuration>
 XML
 
-# Make sure the rewritten config is owned by the syncthing user;
-# we wrote it as root just now.
+# Make sure the rewritten config is owned by the syncthing UID
+# (1000 by default); we wrote it as root just now.
 chown "$ST_UID:$ST_GID" "$CONFIG_FILE"
 
 # -----------------------------------------------------------------
-# Launch syncthing in the background under the syncthing user.
+# Launch syncthing in the background under the unprivileged UID
+# (1000 by default, configurable via PUID/PGID).
 #
 # `STGUIADDRESS=` (empty) cancels the upstream image's ENTRYPOINT
 # default. We're not using their entrypoint, but several scripts
