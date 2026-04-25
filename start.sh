@@ -69,6 +69,13 @@ if [ ! -f "$CONFIG_FILE" ]; then
         --home "$ST_CONFIG_DIR"
 fi
 
+# Port that Syncthing's GUI binds inside the container. The auth-proxy
+# sidecar reads the same env var so the two stay in sync if an operator
+# overrides the default. Keep it on loopback always — the sidecar is
+# the only legitimate caller.
+SYNCTHING_UPSTREAM_PORT="${SYNCTHING_UPSTREAM_PORT:-8385}"
+export SYNCTHING_UPSTREAM_PORT
+
 # Extract the auto-generated API key. Syncthing wrote one into
 # config.xml during `generate`. Even with GUI auth disabled, the
 # REST API requires this key (or a matching auth cookie) — without
@@ -114,7 +121,7 @@ cat > "$CONFIG_FILE" <<XML
             is sufficient and prevents any path that bypasses the
             sidecar.
         -->
-        <address>127.0.0.1:8385</address>
+        <address>127.0.0.1:$SYNCTHING_UPSTREAM_PORT</address>
         <apikey>$APIKEY</apikey>
         <theme>default</theme>
         <!--
@@ -201,7 +208,7 @@ chown syncthing:syncthing "$CONFIG_FILE"
 # to image-vs-data drift that's painful to debug.
 # -----------------------------------------------------------------
 
-echo "[start.sh] Starting Syncthing on 127.0.0.1:8385"
+echo "[start.sh] Starting Syncthing on 127.0.0.1:$SYNCTHING_UPSTREAM_PORT"
 su-exec syncthing:syncthing env \
     STGUIADDRESS= \
     STNOUPGRADE=1 \
@@ -218,10 +225,11 @@ SYNCTHING_PID=$!
 # initial scan can take a few seconds before it accepts GUI
 # connections.
 for _ in 1 2 3 4 5 6 7 8 9 10; do
-    if python3 -c 'import socket,sys
+    if SYNC_PORT="$SYNCTHING_UPSTREAM_PORT" python3 -c 'import os,socket,sys
+p = int(os.environ["SYNC_PORT"])
 s = socket.socket()
 s.settimeout(0.5)
-sys.exit(0 if s.connect_ex(("127.0.0.1", 8385)) == 0 else 1)' 2>/dev/null; then
+sys.exit(0 if s.connect_ex(("127.0.0.1", p)) == 0 else 1)' 2>/dev/null; then
         break
     fi
     # If syncthing already crashed, surface the exit code now

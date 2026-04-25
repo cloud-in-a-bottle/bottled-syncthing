@@ -106,7 +106,7 @@ A few overrideable knobs via env (set them in your zone's app overrides):
 | Variable | Default | Notes |
 |---|---|---|
 | `AUTH_PROXY_LISTEN_PORT` | `8384` | Where the sidecar binds. Match `port` in `openhost.toml` if you change. |
-| `SYNCTHING_UPSTREAM_PORT` | `8385` | Where Syncthing's GUI binds inside the container. Must match `<gui><address>` in `start.sh`'s heredoc — change both together. |
+| `SYNCTHING_UPSTREAM_PORT` | `8385` | Where Syncthing's GUI binds inside the container. `start.sh` and `auth_proxy.py` both read this var so it stays in sync. |
 | `AUTH_PROXY_LOG_LEVEL` | `INFO` | Set to `DEBUG` for verbose proxy logs. |
 
 ## Upgrading
