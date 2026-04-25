@@ -242,7 +242,7 @@ sys.exit(0 if s.connect_ex(("127.0.0.1", p)) == 0 else 1)' 2>/dev/null; then
     sleep 0.5
 done
 
-echo "[start.sh] Starting auth-proxy on 0.0.0.0:8384"
+echo "[start.sh] Starting auth-proxy on 0.0.0.0:${AUTH_PROXY_LISTEN_PORT:-8384}"
 /opt/auth-venv/bin/python3 /app/auth_proxy.py &
 PROXY_PID=$!
 
