@@ -29,15 +29,22 @@ ST_DATA_DIR="$PERSIST/data"
 
 mkdir -p "$ST_CONFIG_DIR" "$ST_DATA_DIR"
 
-# Syncthing inside the upstream image runs as UID 1000 (user `syncthing`).
+# Syncthing inside the upstream image runs as UID 1000 / GID 1000.
+# The upstream image does NOT create a named `syncthing` user — the
+# entrypoint just calls `su-exec 1000:1000`. We follow the same
+# convention (numeric IDs) so our chown works regardless of whether
+# the upstream image is rebuilt with a named user later.
+#
 # OpenHost's app_data dir comes in owned by whoever the container
 # runtime mapped — typically root in plain Docker, or a UID-mapped
-# owner under rootless podman. Make sure the syncthing user can read
-# and write its own state regardless. We chown only the subdirs we
-# manage (config/ and data/) rather than the entire PERSIST root, so
-# that other tooling sharing app_data (none today, but futureproof)
+# owner under rootless podman. Make sure the syncthing process can
+# read and write its own state regardless. We chown only the subdirs
+# we manage (config/ and data/) rather than the entire PERSIST root,
+# so that other tooling sharing app_data (none today, but futureproof)
 # isn't affected.
-chown -R syncthing:syncthing "$ST_CONFIG_DIR" "$ST_DATA_DIR"
+ST_UID="${PUID:-1000}"
+ST_GID="${PGID:-1000}"
+chown -R "$ST_UID:$ST_GID" "$ST_CONFIG_DIR" "$ST_DATA_DIR"
 
 # -----------------------------------------------------------------
 # Generate Syncthing's config.xml on first boot.
@@ -64,7 +71,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
     # `syncthing generate` is idempotent on a populated dir but we
     # only run it when the config is missing to keep startup fast
     # on every other boot.
-    su-exec syncthing:syncthing syncthing generate \
+    su-exec "$ST_UID:$ST_GID" syncthing generate \
         --no-default-folder \
         --home "$ST_CONFIG_DIR"
 fi
@@ -193,7 +200,7 @@ XML
 
 # Make sure the rewritten config is owned by the syncthing user;
 # we wrote it as root just now.
-chown syncthing:syncthing "$CONFIG_FILE"
+chown "$ST_UID:$ST_GID" "$CONFIG_FILE"
 
 # -----------------------------------------------------------------
 # Launch syncthing in the background under the syncthing user.
@@ -209,7 +216,7 @@ chown syncthing:syncthing "$CONFIG_FILE"
 # -----------------------------------------------------------------
 
 echo "[start.sh] Starting Syncthing on 127.0.0.1:$SYNCTHING_UPSTREAM_PORT"
-su-exec syncthing:syncthing env \
+su-exec "$ST_UID:$ST_GID" env \
     STGUIADDRESS= \
     STNOUPGRADE=1 \
     HOME=/tmp \
