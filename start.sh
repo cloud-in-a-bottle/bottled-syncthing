@@ -219,7 +219,7 @@ su-exec syncthing:syncthing env \
         --home "$ST_CONFIG_DIR" &
 SYNCTHING_PID=$!
 
-# Give syncthing a moment to bind 127.0.0.1:8385 so the sidecar's
+# Give syncthing a moment to bind 127.0.0.1:$SYNCTHING_UPSTREAM_PORT so the sidecar's
 # first probe doesn't get connection-refused. Polling the socket
 # is more reliable than a fixed sleep — under load syncthing's
 # initial scan can take a few seconds before it accepts GUI
