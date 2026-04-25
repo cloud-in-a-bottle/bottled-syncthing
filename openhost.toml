@@ -1,0 +1,62 @@
+[app]
+name = "syncthing"
+version = "0.1.0"
+description = "Syncthing peer-to-peer file synchronization with OpenHost SSO"
+
+[runtime.container]
+image = "Dockerfile"
+# The auth-proxy sidecar (auth_proxy.py) listens here and reverse-proxies
+# to Syncthing's GUI on 127.0.0.1:8385. Syncthing's own GUI auth is
+# disabled — the sidecar verifies the OpenHost zone_auth cookie and gates
+# access to the owner. Syncthing has no per-user permissions, so the only
+# question is "is this the OpenHost owner?", which the sidecar answers.
+port = 8384
+
+# TCP+UDP 22000 — the sync protocol (TCP) and QUIC (UDP) on the same
+# port. OpenHost binds [[ports]] entries on both protocols automatically,
+# so this single entry covers both. Host port preallocated by the
+# environment shared context.
+[[ports]]
+label = "sync"
+container_port = 22000
+host_port = 9101
+
+# UDP 21027 — local discovery / multicast. Used by Syncthing peers on
+# the same broadcast domain to find each other. With OpenHost running
+# in a typical cloud VM there is rarely a useful "local" LAN, but we
+# expose the port anyway so a peer on the same host network (e.g. a
+# self-hosted home-LAN bridge) can discover us.
+[[ports]]
+label = "discovery"
+container_port = 21027
+host_port = 9102
+
+[routing]
+# Syncthing exposes a small unauthenticated health endpoint at
+# /rest/noauth/health that the OpenHost router can use as a liveness
+# probe. The auth-proxy whitelists the same path so probes don't get
+# redirected to the SSO login.
+health_check = "/rest/noauth/health"
+# Public so the auth-proxy sidecar handles auth itself. The sidecar
+# verifies the zone_auth cookie against the router's JWKS and only
+# forwards owner traffic to Syncthing; everyone else gets 403. Without
+# `public_paths = ["/"]` the OpenHost router gates access at its layer
+# and the cookie never reaches the sidecar — fine, but redundant. We
+# pick public_paths here so the sidecar is the single auth chokepoint
+# and behavior is identical regardless of which paths are exposed.
+public_paths = ["/"]
+
+[resources]
+# Syncthing's footprint depends mostly on the size of its index. For a
+# small-to-medium dataset (under ~100k files) 256MB is plenty; the
+# sidecar adds another ~30MB. Bump if your index gets large.
+memory_mb = 512
+cpu_millicores = 500
+
+[data]
+# All Syncthing state — config.xml, certs, indexes, plus the synced
+# folders themselves — lives under OPENHOST_APP_DATA_DIR. The user
+# can configure folders inside the GUI under /data inside the
+# container, which corresponds to the persistent app_data path on
+# the host.
+app_data = true
