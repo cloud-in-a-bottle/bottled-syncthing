@@ -7,10 +7,10 @@
 #     for our auth-proxy sidecar (auth_proxy.py).
 #   * bash — start.sh uses `wait -n`, which Alpine's default
 #     /bin/sh (busybox ash) does not implement.
-#   * su-exec — used by start.sh to drop privileges back to the
-#     unprivileged syncthing user when launching the daemon. Already
-#     present in the upstream image but listed explicitly so a
-#     future base-image change doesn't silently remove it.
+#   * su-exec — used by start.sh to drop privileges to UID 1000
+#     (the unprivileged Syncthing UID) when launching the daemon.
+#     Already present in the upstream image but listed explicitly
+#     so a future base-image change doesn't silently remove it.
 #
 # We bypass the upstream entrypoint entirely. It does PUID/PGID
 # remapping, which OpenHost handles via its container runtime, and
@@ -33,9 +33,9 @@ FROM syncthing/syncthing:1.30.0
 USER root
 
 # bash for `wait -n`, python3 for the auth-proxy, py3-pip for
-# venv-bootstrap, su-exec to drop privileges back to the syncthing
-# user when launching the daemon. su-exec is already in the upstream
-# image but list it explicitly so a future base-image change doesn't
+# venv-bootstrap, su-exec to drop privileges to UID 1000 when
+# launching the daemon. su-exec is already in the upstream image
+# but list it explicitly so a future base-image change doesn't
 # silently remove it.
 RUN apk add --no-cache \
         bash \
