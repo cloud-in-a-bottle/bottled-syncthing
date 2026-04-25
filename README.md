@@ -15,7 +15,7 @@ On first boot the container:
 
 1. Generates a fresh Syncthing identity (device ID + TLS certs) under `$OPENHOST_APP_DATA_DIR/config/`.
 2. Writes a hardened `config.xml` that:
-   - Binds the GUI on `127.0.0.1:8385` (so only the auth-proxy sidecar — running in the same container — can reach it)
+   - Binds the GUI on `127.0.0.1:8385` by default (configurable via `SYNCTHING_UPSTREAM_PORT`) so only the auth-proxy sidecar — running in the same container — can reach it
    - Disables Syncthing's own GUI auth (no username/password — see "Authentication" below)
    - Sets `insecureSkipHostcheck=true` so the sidecar's rewritten Host header doesn't get rejected
    - Pins the sync ports to TCP+QUIC `0.0.0.0:22000` (matching the `[[ports]]` entries in `openhost.toml`)
@@ -29,7 +29,7 @@ If either child process exits, the container exits and OpenHost restarts it.
 
 Syncthing has no per-user authentication model — it's a single-tenant daemon. Anyone who can reach the GUI can configure every aspect of the sync setup. So the only auth question is "is this the OpenHost owner?", and we answer it once at the proxy layer.
 
-The auth-proxy sidecar verifies the visitor's `zone_auth` JWT cookie against the OpenHost router's JWKS at `$OPENHOST_ROUTER_URL/.well-known/jwks.json`. When the cookie is a valid RS256 token with `sub == "owner"`, the request is forwarded to Syncthing on `127.0.0.1:8385`. Otherwise the proxy returns `403 Forbidden`.
+The auth-proxy sidecar verifies the visitor's `zone_auth` JWT cookie against the OpenHost router's JWKS at `$OPENHOST_ROUTER_URL/.well-known/jwks.json`. When the cookie is a valid RS256 token with `sub == "owner"`, the request is forwarded to Syncthing on the loopback upstream port (`127.0.0.1:$SYNCTHING_UPSTREAM_PORT`, default `8385`). Otherwise the proxy returns `403 Forbidden`.
 
 A single path is whitelisted without a cookie:
 

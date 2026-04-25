@@ -313,9 +313,10 @@ class AuthProxyHandler(BaseHTTPRequestHandler):
             cleaned_headers.append(("Host", forwarded_host))
             explicit_host_set = True
 
-        # Auth gate. Two routes through:
-        #   1. Path is a router liveness probe → allow without cookie.
-        #   2. Cookie verifies as a valid owner JWT → allow.
+        # Auth gate. A request is allowed through if either:
+        #   1. The path is a router liveness probe (the only JWT
+        #      bypass — see HEALTH_PATHS), or
+        #   2. The cookie verifies as a valid owner JWT.
         # Anything else → 403.
         path_for_check = self.path or ""
         is_health = _is_health_path(path_for_check)

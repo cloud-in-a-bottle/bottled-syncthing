@@ -233,8 +233,8 @@ SYNCTHING_PID=$!
 # initial scan can take a few seconds before it accepts GUI
 # connections.
 for _ in 1 2 3 4 5 6 7 8 9 10; do
-    if SYNC_PORT="$SYNCTHING_UPSTREAM_PORT" python3 -c 'import os,socket,sys
-p = int(os.environ["SYNC_PORT"])
+    if python3 -c 'import os,socket,sys
+p = int(os.environ["SYNCTHING_UPSTREAM_PORT"])
 s = socket.socket()
 s.settimeout(0.5)
 sys.exit(0 if s.connect_ex(("127.0.0.1", p)) == 0 else 1)' 2>/dev/null; then
