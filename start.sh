@@ -17,17 +17,30 @@ PERSIST="${OPENHOST_APP_DATA_DIR:-/var/syncthing}"
 #               losing your device ID, certs, and folder configs.
 #   data/     — recommended top-level folder for synced data. Users
 #               can point Syncthing folders elsewhere under PERSIST,
-#               but data/ is the obvious starting place. We don't
-#               auto-create any synced folders — the user does that
-#               from the GUI.
+#               but data/ is the obvious starting place. We pre-
+#               create one sub-folder (`data/share/`) and register
+#               it as a Syncthing folder named "share" so new
+#               operators have a concrete, working folder to attach
+#               a paired device to without needing to think about
+#               paths. Both the directory and the <folder> entry are
+#               re-emitted on every boot, matching the same rewrite
+#               policy this script applies to the rest of config.xml.
 #
 # We don't symlink Syncthing's expected paths here because Syncthing
 # lets us pass the config dir explicitly via STHOMEDIR — much cleaner
 # than the symlink-the-install-tree trick the BBS package uses.
 ST_CONFIG_DIR="$PERSIST/config"
 ST_DATA_DIR="$PERSIST/data"
+# compute_space mounts the persistent app-data dir at /data inside
+# the container, so PERSIST=/data, ST_DATA_DIR=/data/data, and the
+# example share dir lives at /data/data/share inside the container.
+# That same directory shows up on the OpenHost host as
+# /data/app_data/syncthing/data/share — both paths refer to the
+# same on-disk location. The README documents /data/data/ as the
+# canonical drop-in path the operator should target from the GUI.
+ST_EXAMPLE_SHARE_DIR="$ST_DATA_DIR/share"
 
-mkdir -p "$ST_CONFIG_DIR" "$ST_DATA_DIR"
+mkdir -p "$ST_CONFIG_DIR" "$ST_DATA_DIR" "$ST_EXAMPLE_SHARE_DIR"
 
 # Syncthing inside the upstream image runs as UID 1000 / GID 1000.
 # The upstream image does NOT create a named `syncthing` user — the
@@ -100,6 +113,28 @@ if [ -z "$APIKEY" ]; then
     echo "[start.sh] Warning: could not parse apikey from existing config.xml; generating a new one"
     APIKEY=$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 32)
 fi
+
+# <folder> block that goes into the rewritten config.xml. It
+# registers data/share/ as a Syncthing folder named "share" so
+# the operator has a concrete folder ready to share with a paired
+# device. The <folder> entry is re-emitted on every boot — same
+# policy as everything else this script writes into config.xml —
+# so an operator who removes the folder from the GUI will see it
+# come back on the next restart. That's consistent with how the
+# rest of the file is managed; persistent removal would require
+# editing this script (or removing this block).
+#
+# Path /data/data/share is the in-container view; the same
+# directory appears on the OpenHost host as
+# /data/app_data/syncthing/data/share. Either path refers to the
+# canonical drop-in location for content the operator wants
+# replicated to paired devices.
+FOLDER_BLOCK='    <folder id="share" label="share" path="/data/data/share" type="sendreceive"
+            rescanIntervalS="3600" fsWatcherEnabled="true">
+        <filesystemType>basic</filesystemType>
+        <minDiskFree unit="%">1</minDiskFree>
+        <maxConflicts>10</maxConflicts>
+    </folder>'
 
 # Always rewrite config.xml on boot so that:
 #   * upgrades to this image push fresh defaults forward
@@ -195,6 +230,7 @@ cat > "$CONFIG_FILE" <<XML
             <maxConflicts>10</maxConflicts>
         </folder>
     </defaults>
+$FOLDER_BLOCK
 </configuration>
 XML
 
