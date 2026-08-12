@@ -1,10 +1,10 @@
-# openhost-syncthing
+# bottled-syncthing
 
-[Syncthing](https://syncthing.net) — peer-to-peer continuous file synchronization — packaged for OpenHost.
+[Syncthing](https://syncthing.net) — peer-to-peer continuous file synchronization — packaged for Cloud in a Bottle.
 
-Deploy this on your OpenHost instance and you get:
+Deploy this on your Cloud in a Bottle instance and you get:
 
-- A web UI at `https://syncthing.<your-zone>/` (gated by your zone's OpenHost SSO — only the owner can reach it)
+- A web UI at `https://syncthing.<your-zone>/` (gated by your zone's Cloud in a Bottle SSO — only the owner can reach it)
 - TCP+UDP sync protocol on host port `9101` (container port `22000`)
 - UDP local-discovery on host port `9102` (container port `21027`)
 - All sync state (config, certs, indexes, optional shared folders) under `$OPENHOST_APP_DATA_DIR`
@@ -19,35 +19,35 @@ On first boot the container:
    - Disables Syncthing's own GUI auth (no username/password — see "Authentication" below)
    - Sets `insecureSkipHostcheck=true` so the sidecar's rewritten Host header doesn't get rejected
    - Pins the sync ports to TCP+QUIC `0.0.0.0:22000` (matching the `[[ports]]` entries in `openhost.toml`)
-   - Disables the in-app self-upgrader (`STNOUPGRADE=1`) — upgrades happen via the OpenHost reload-with-update flow
+   - Disables the in-app self-upgrader (`STNOUPGRADE=1`) — upgrades happen via the Cloud in a Bottle reload-with-update flow
 3. Starts Syncthing as the unprivileged UID 1000 (configurable via `PUID`/`PGID`) via `su-exec`. The upstream image uses numeric IDs and does not create a named user.
 4. Starts the auth-proxy sidecar (`auth_proxy.py`) on `0.0.0.0:8384`.
 
-If either child process exits, the container exits and OpenHost restarts it.
+If either child process exits, the container exits and Cloud in a Bottle restarts it.
 
 ## Authentication
 
-Syncthing has no per-user authentication model — it's a single-tenant daemon. Anyone who can reach the GUI can configure every aspect of the sync setup. So the only auth question is "is this the OpenHost owner?", and we answer it once at the proxy layer.
+Syncthing has no per-user authentication model — it's a single-tenant daemon. Anyone who can reach the GUI can configure every aspect of the sync setup. So the only auth question is "is this the Cloud in a Bottle owner?", and we answer it once at the proxy layer.
 
-The auth-proxy sidecar verifies the visitor's `zone_auth` JWT cookie against the OpenHost router's JWKS at `$OPENHOST_ROUTER_URL/.well-known/jwks.json`. When the cookie is a valid RS256 token with `sub == "owner"`, the request is forwarded to Syncthing on the loopback upstream port (`127.0.0.1:$SYNCTHING_UPSTREAM_PORT`, default `8385`). Otherwise the proxy returns `403 Forbidden`.
+The auth-proxy sidecar verifies the visitor's `zone_auth` JWT cookie against the Cloud in a Bottle router's JWKS at `$OPENHOST_ROUTER_URL/.well-known/jwks.json`. When the cookie is a valid RS256 token with `sub == "owner"`, the request is forwarded to Syncthing on the loopback upstream port (`127.0.0.1:$SYNCTHING_UPSTREAM_PORT`, default `8385`). Otherwise the proxy returns `403 Forbidden`.
 
 A single path is whitelisted without a cookie:
 
-- `/rest/noauth/health` — Syncthing's built-in unauthenticated liveness endpoint, used by the OpenHost router as the `health_check` target in `openhost.toml`.
+- `/rest/noauth/health` — Syncthing's built-in unauthenticated liveness endpoint, used by the Cloud in a Bottle router as the `health_check` target in `openhost.toml`.
 
 Implementation choices that matter for security:
 
 - **Syncthing binds 127.0.0.1, not 0.0.0.0.** The sidecar is the only loopback caller, so there's no in-container path that bypasses auth.
 - **The sidecar strips any client-supplied `X-Openhost-User` header.** Syncthing doesn't read the header today, but stripping it is defence-in-depth against future configuration drift.
-- **The JWKS is cached for 10 minutes with stale-fallback** so a transient router outage doesn't lock the owner out. Same pattern as `openhost-miniflux` and `openhost-mirotalk-p2p`.
+- **The JWKS is cached for 10 minutes with stale-fallback** so a transient router outage doesn't lock the owner out. Same pattern as `bottled-miniflux` and `bottled-mirotalk-p2p`.
 - **`insecureSkipHostcheck` is enabled** so the sidecar's rewritten Host header (the user's original `syncthing.<zone>` hostname, taken from `X-Forwarded-Host`) doesn't trigger Syncthing's "Host header doesn't look like localhost" rejection. The rewrite itself happens in the sidecar, so dropping `insecureSkipHostcheck` is a future hardening option if Syncthing tightens its check semantics.
 
-There is no Syncthing-local password to remember, leak, or rotate. Sign in to your OpenHost zone, and you're signed in to Syncthing.
+There is no Syncthing-local password to remember, leak, or rotate. Sign in to your Cloud in a Bottle zone, and you're signed in to Syncthing.
 
 ## Deploying
 
 ```bash
-oh app deploy https://github.com/imbue-openhost/openhost-syncthing --wait
+oh app deploy https://github.com/imbue-openhost/bottled-syncthing --wait
 ```
 
 Or, on `andrew-1`:
@@ -55,13 +55,13 @@ Or, on `andrew-1`:
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
     https://andrew-1.selfhost.imbue.com/api/add_app \
-    -d 'repo_url=https://github.com/imbue-openhost/openhost-syncthing'
+    -d 'repo_url=https://github.com/imbue-openhost/bottled-syncthing'
 ```
 
 The app will be available at `https://syncthing.<zone-domain>/`. Browse to it from a session signed into the zone — you're already authenticated. Inside the GUI:
 
 1. Note your device ID (top right → "Actions" → "Show ID"). Share this with peers you want to sync with.
-2. Click "Add Folder", give it a path under `/data/data/` (the in-container path that maps to `$OPENHOST_APP_DATA_DIR/data/`). This is where your synced files end up on the OpenHost host.
+2. Click "Add Folder", give it a path under `/data/data/` (the in-container path that maps to `$OPENHOST_APP_DATA_DIR/data/`). This is where your synced files end up on the Cloud in a Bottle host.
 3. Add the peer device IDs you want to sync with under "Add Remote Device".
 
 ## Data layout
@@ -81,7 +81,7 @@ $OPENHOST_APP_DATA_DIR/
 
 You can configure folders anywhere readable under the container, but only files under `$OPENHOST_APP_DATA_DIR/` are persisted across deploys, restarts, and image rebuilds. Pointing a Syncthing folder at e.g. `/tmp` will sync to other peers but the contents won't survive a container restart.
 
-This is the cleanest fit for OpenHost's per-app data model. Cross-app sync (e.g. backing up another OpenHost app's data via Syncthing) would need the `access_all_apps_data` manifest flag, which isn't in this manifest by design — every byte that lands in your zone via Syncthing is a byte the peer can see and an attacker can probe, so we keep the blast radius narrow.
+This is the cleanest fit for Cloud in a Bottle's per-app data model. Cross-app sync (e.g. backing up another Cloud in a Bottle app's data via Syncthing) would need the `access_all_apps_data` manifest flag, which isn't in this manifest by design — every byte that lands in your zone via Syncthing is a byte the peer can see and an attacker can probe, so we keep the blast radius narrow.
 
 ## Ports
 
@@ -91,7 +91,7 @@ This is the cleanest fit for OpenHost's per-app data model. Cross-app sync (e.g.
 | Sync | TCP+UDP | sync protocol + QUIC | `9101` | `22000` |
 | Discovery | UDP | local LAN discovery | `9102` | `21027` |
 
-OpenHost binds each `[[ports]]` entry on both TCP and UDP automatically, so the single `sync` entry covers both the TCP sync protocol and the QUIC variant, and the single `discovery` entry covers UDP/21027 (TCP/21027 just goes nowhere — Syncthing doesn't listen on it).
+Cloud in a Bottle binds each `[[ports]]` entry on both TCP and UDP automatically, so the single `sync` entry covers both the TCP sync protocol and the QUIC variant, and the single `discovery` entry covers UDP/21027 (TCP/21027 just goes nowhere — Syncthing doesn't listen on it).
 
 ## Configuration
 
@@ -115,7 +115,7 @@ The Dockerfile pins the upstream image to a specific tag (`syncthing/syncthing:1
 
 1. Bump the tag in `Dockerfile`.
 2. Commit + push.
-3. In the OpenHost dashboard, click "Reload" on the syncthing app with the update option checked.
+3. In the Cloud in a Bottle dashboard, click "Reload" on the syncthing app with the update option checked.
 
 The data dir (`config/`, `data/`) is preserved across upgrades. Only the immutable install tree gets replaced.
 
@@ -144,16 +144,16 @@ curl https://syncthing.<zone-domain>/rest/noauth/health
 
 ## Caveats
 
-- **Single-tenant only.** Syncthing has no per-user concept; the OpenHost owner is the only person who should be using this app. Don't share the proxy URL or invite Syncthing peers you don't trust — once a device pair is added, that peer can read every byte you put in shared folders.
+- **Single-tenant only.** Syncthing has no per-user concept; the Cloud in a Bottle owner is the only person who should be using this app. Don't share the proxy URL or invite Syncthing peers you don't trust — once a device pair is added, that peer can read every byte you put in shared folders.
 - **Discovery via global servers means metadata leaks.** When `<globalAnnounceEnabled>` is true (the default), Syncthing tells the public discovery servers your device ID and current public IP. That's the only way peer-finding works through NAT. If you want to keep that private, set up a private discovery server, or sync only over `dynamic`/explicit addresses.
-- **Sync ports are exposed to the open internet.** Anything that can reach host port `9101` can attempt to negotiate a Syncthing handshake with your device; without your device ID being in their config, they get rejected, but the existence of the daemon is observable. Firewall the OpenHost host ports if you want to restrict reachability to a VPN.
-- **Ports `9101` and `9102` are pre-allocated for this app.** If you also try to deploy another app that wants those host ports, the second deploy will fail. The pre-allocation is done in the OpenHost shared-context to prevent this.
-- **First-deploy race window.** Anyone who hits `https://syncthing.<zone>/` before you've signed into your zone's OpenHost dashboard will get `403`, but the daemon is already running and accepting peer-protocol connections on `9101`. Configure your peers from the GUI promptly after deploying.
+- **Sync ports are exposed to the open internet.** Anything that can reach host port `9101` can attempt to negotiate a Syncthing handshake with your device; without your device ID being in their config, they get rejected, but the existence of the daemon is observable. Firewall the Cloud in a Bottle host ports if you want to restrict reachability to a VPN.
+- **Ports `9101` and `9102` are pre-allocated for this app.** If you also try to deploy another app that wants those host ports, the second deploy will fail. The pre-allocation is done in the Cloud in a Bottle shared-context to prevent this.
+- **First-deploy race window.** Anyone who hits `https://syncthing.<zone>/` before you've signed into your zone's Cloud in a Bottle dashboard will get `403`, but the daemon is already running and accepting peer-protocol connections on `9101`. Configure your peers from the GUI promptly after deploying.
 
 ## Files
 
 - `Dockerfile` — extends `syncthing/syncthing:1.30.0` with bash + a Python venv for the auth-proxy.
-- `openhost.toml` — OpenHost manifest. Pre-allocated host ports for sync (9101) and discovery (9102).
+- `openhost.toml` — Cloud in a Bottle manifest. Pre-allocated host ports for sync (9101) and discovery (9102).
 - `start.sh` — generates Syncthing identity on first boot, rewrites `config.xml` with hardened defaults, supervises the daemon and the auth-proxy sidecar.
 - `auth_proxy.py` — JWT-verifying reverse proxy. Allows owner traffic and `/rest/noauth/health` probes; everything else gets 403.
 - `README.md` — this file.
